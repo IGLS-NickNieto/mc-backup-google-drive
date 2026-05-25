@@ -1,0 +1,12 @@
+[Unit]
+Description=Minecraft offsite backup to Google Drive
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Update this path if the repo lives somewhere other than /opt/minecraft-backup-google-drive
+WorkingDirectory=/opt/minecraft-backup-google-drive
+ExecStart=/opt/minecraft-backup-google-drive/scripts/offsite-backup.sh
+

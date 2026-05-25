@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Minecraft backup verification daily
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+logs/
+*.log
+runtime/
+staging/
+secrets/*
+!secrets/.gitkeep
+*.pem
+*.key
+*.p12
+*.pfx
+*.kdbx
+rclone.conf
+.DS_Store
+Thumbs.db
