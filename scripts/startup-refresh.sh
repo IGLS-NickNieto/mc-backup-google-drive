@@ -81,6 +81,7 @@ sync_repo_snapshot_from_git() {
   run_as_app_owner rsync -a --delete \
     --exclude '.git/' \
     --exclude '.env' \
+    --include '.env.example' \
     --exclude '.env.*' \
     --exclude 'logs/' \
     --exclude 'runtime/' \

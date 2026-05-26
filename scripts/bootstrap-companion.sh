@@ -99,6 +99,7 @@ sync_repo_snapshot_from_git() {
   run_as_app_user rsync -a --delete \
     --exclude '.git/' \
     --exclude '.env' \
+    --include '.env.example' \
     --exclude '.env.*' \
     --exclude 'logs/' \
     --exclude 'runtime/' \
@@ -285,6 +286,7 @@ elif [[ "${ROOT_DIR}" != "${APP_DIR}" ]]; then
   rsync -a --delete \
     --exclude '.git/' \
     --exclude '.env' \
+    --include '.env.example' \
     --exclude '.env.*' \
     --exclude 'logs/' \
     --exclude 'runtime/' \
