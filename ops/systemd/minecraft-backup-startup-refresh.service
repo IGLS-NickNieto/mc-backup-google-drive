@@ -1,0 +1,14 @@
+[Unit]
+Description=Refresh Minecraft backup companion from Git and refresh timers on boot
+After=network-online.target docker.service minecraft-startup-refresh.service
+Wants=network-online.target minecraft-startup-refresh.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Update this path if the repo lives somewhere other than /opt/minecraft-backup-google-drive
+WorkingDirectory=/opt/minecraft-backup-google-drive
+ExecStart=/opt/minecraft-backup-google-drive/scripts/startup-refresh.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -24,6 +24,23 @@ This project is meant to live beside the main Minecraft runtime on the Ubuntu VM
 
 ## Quick Setup
 
+Recommended same-host bootstrap after the core repo is already healthy:
+
+```bash
+bash scripts/bootstrap-companion.sh
+```
+
+That command now:
+
+- fills or repairs `.env` from public-safe defaults
+- auto-points at `/opt/minecraft` unless you override it
+- prompts for the Google Drive remote and repository only when still missing
+- creates the local `restic` password file if needed
+- validates or opens `rclone config` interactively when the configured remote is missing
+- installs the local, offsite, verify, and startup-refresh systemd units
+
+Manual flow remains available if you want to configure each step yourself:
+
 1. Copy `.env.example` to `.env` and set:
    - `TARGET_STACK_ROOT`
    - `RESTIC_REPOSITORY`
