@@ -125,7 +125,7 @@ EOF
     cp "${TARGET_INVITE_PLAYERS_FILE}" "${METADATA_DIR}/ops/access/invite-players.txt"
   fi
 
-  python - "${TARGET_STACK_ROOT}" "${TARGET_CONFIG_DIR}" "${TARGET_SECRETS_DIR}" "${METADATA_DIR}" <<'PY'
+  python3 - "${TARGET_STACK_ROOT}" "${TARGET_CONFIG_DIR}" "${TARGET_SECRETS_DIR}" "${METADATA_DIR}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -309,7 +309,7 @@ main() {
 
   log "Offsite backup completed with snapshot ${SNAPSHOT_ID}"
   if [[ "${JSON_OUTPUT}" == "1" ]]; then
-    python - "${SNAPSHOT_ID}" "${RUN_TIMESTAMP}" "${LOG_FILE}" "${RUN_DIR}" <<'PY' >&3
+    python3 - "${SNAPSHOT_ID}" "${RUN_TIMESTAMP}" "${LOG_FILE}" "${RUN_DIR}" <<'PY' >&3
 import json, sys
 print(json.dumps({
     "status": "success",

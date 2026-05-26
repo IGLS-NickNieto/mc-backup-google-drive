@@ -38,7 +38,7 @@ main() {
 
   if [[ "${JSON_OUTPUT}" == "1" ]]; then
     snapshots_output="$("${RESTIC_BIN}" --cache-dir "${RESTIC_CACHE_DIR}" snapshots --json "$@")"
-    python - "${snapshots_output}" <<'PY'
+    python3 - "${snapshots_output}" <<'PY'
 import json, sys
 snapshots = json.loads(sys.argv[1])
 print(json.dumps({"status": "success", "snapshot_count": len(snapshots), "snapshots": snapshots}, sort_keys=True))

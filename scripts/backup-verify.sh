@@ -66,7 +66,7 @@ main() {
 
   log "Backup verification completed"
   if [[ "${JSON_OUTPUT}" == "1" ]]; then
-    python - "${archive_path}" "${staged_restore}" "${VERIFY_OFFSITE_SNAPSHOT:-0}" "${VERIFY_CONFIG_ASSETS:-1}" "${offsite_config_stage}" <<'PY' >&3
+    python3 - "${archive_path}" "${staged_restore}" "${VERIFY_OFFSITE_SNAPSHOT:-0}" "${VERIFY_CONFIG_ASSETS:-1}" "${offsite_config_stage}" <<'PY' >&3
 import json, sys
 print(json.dumps({
     "status": "success",

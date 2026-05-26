@@ -185,7 +185,7 @@ main() {
 
   log "Rollback promotion completed"
   if [[ "${JSON_OUTPUT}" == "1" ]]; then
-    python - "${staged_restore}" "${scope}" "${ALLOW_PLAYERDATA_ROLLBACK}" <<'PY' >&3
+    python3 - "${staged_restore}" "${scope}" "${ALLOW_PLAYERDATA_ROLLBACK}" <<'PY' >&3
 import json, sys
 print(json.dumps({
     "status": "success",

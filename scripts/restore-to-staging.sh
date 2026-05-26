@@ -142,7 +142,7 @@ main() {
   write_restore_manifest "${source_kind}" "${source_ref}" "${scope}"
   log "Staged restore created at ${STAGE_DIR}"
   if [[ "${JSON_OUTPUT}" == "1" ]]; then
-    python - "${STAGE_DIR}" "${source_kind}" "${source_ref}" "${scope}" <<'PY' >&3
+    python3 - "${STAGE_DIR}" "${source_kind}" "${source_ref}" "${scope}" <<'PY' >&3
 import json, sys
 print(json.dumps({
     "status": "success",
