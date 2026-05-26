@@ -7,6 +7,13 @@ source "${SCRIPT_DIR}/lib/common.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/load-target-env.sh"
 
+JSON_OUTPUT=0
+
+while [[ "${1:-}" == "--json" ]]; do
+  JSON_OUTPUT=1
+  shift
+done
+
 resolve_source_path() {
   local source_ref="$1"
 
@@ -49,7 +56,8 @@ setup_restic_restore_env() {
 restore_restic_snapshot() {
   local snapshot_ref="$1"
   local scope="$2"
-  local raw_restore_dir include_path raw_data_root
+  local raw_restore_dir raw_data_root
+  local include_path
 
   setup_restic_restore_env
   require_command "${RESTIC_BIN}"
@@ -58,22 +66,29 @@ restore_restic_snapshot() {
   ensure_dir "${raw_restore_dir}"
 
   if [[ "${scope}" == "full" ]]; then
-    include_path="${TARGET_DATA_DIR}"
+    while IFS= read -r include_path; do
+      "${RESTIC_BIN}" --cache-dir "${RESTIC_CACHE_DIR}" restore "${snapshot_ref}" \
+        --target "${raw_restore_dir}" \
+        --include "${include_path}"
+    done < <(full_restore_paths)
   else
     include_path="${TARGET_DATA_DIR}/${scope}"
+    "${RESTIC_BIN}" --cache-dir "${RESTIC_CACHE_DIR}" restore "${snapshot_ref}" \
+      --target "${raw_restore_dir}" \
+      --include "${include_path}"
   fi
-
-  "${RESTIC_BIN}" --cache-dir "${RESTIC_CACHE_DIR}" restore "${snapshot_ref}" \
-    --target "${raw_restore_dir}" \
-    --include "${include_path}"
-
-  raw_data_root="${raw_restore_dir}/${TARGET_DATA_DIR#/}"
-  [[ -d "${raw_data_root}" ]] || fail "Restored snapshot did not contain ${include_path}"
 
   ensure_dir "${STAGE_DIR}/data"
   if [[ "${scope}" == "full" ]]; then
+    raw_data_root="${raw_restore_dir}/${TARGET_DATA_DIR#/}"
+    [[ -d "${raw_data_root}" ]] || fail "Restored snapshot did not contain ${TARGET_DATA_DIR}"
     copy_tree_if_exists "${raw_data_root}" "${STAGE_DIR}/data"
+    copy_tree_if_exists "${raw_restore_dir}/${TARGET_ACCESS_DIR#/}" "${STAGE_DIR}/ops/access"
+    copy_tree_if_exists "${raw_restore_dir}/${TARGET_CONFIG_DIR#/}" "${STAGE_DIR}/config"
+    copy_tree_if_exists "${raw_restore_dir}/${TARGET_SECRETS_DIR#/}" "${STAGE_DIR}/secrets"
   else
+    raw_data_root="${raw_restore_dir}/${TARGET_DATA_DIR#/}"
+    [[ -d "${raw_data_root}" ]] || fail "Restored snapshot did not contain ${include_path}"
     copy_tree_if_exists "${raw_data_root}/${scope}" "${STAGE_DIR}/data/${scope}"
   fi
 }
@@ -101,6 +116,10 @@ main() {
   source_ref="$(resolve_source_path "$1")"
   scope="${2:-full}"
 
+  if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    exec 3>&1 1>&2
+  fi
+
   init_logging restore-to-staging
   load_repo_env
   load_target_env
@@ -122,7 +141,20 @@ main() {
 
   write_restore_manifest "${source_kind}" "${source_ref}" "${scope}"
   log "Staged restore created at ${STAGE_DIR}"
-  printf '%s\n' "${STAGE_DIR}"
+  if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    python - "${STAGE_DIR}" "${source_kind}" "${source_ref}" "${scope}" <<'PY' >&3
+import json, sys
+print(json.dumps({
+    "status": "success",
+    "stage_dir": sys.argv[1],
+    "source_kind": sys.argv[2],
+    "source_ref": sys.argv[3],
+    "scope": sys.argv[4],
+}, sort_keys=True))
+PY
+  else
+    printf '%s\n' "${STAGE_DIR}"
+  fi
 }
 
 main "$@"

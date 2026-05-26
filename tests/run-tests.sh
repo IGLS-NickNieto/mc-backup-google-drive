@@ -164,6 +164,11 @@ setup_fake_stack() {
     "${stack_root}/scripts" \
     "${stack_root}/ops/access" \
     "${stack_root}/backups/daily" \
+    "${stack_root}/config/proxy/plugins/Geyser-Velocity" \
+    "${stack_root}/config/lobby/config" \
+    "${stack_root}/config/survival/config" \
+    "${stack_root}/config/creative/config" \
+    "${stack_root}/secrets" \
     "${stack_root}/data/proxy" \
     "${stack_root}/data/lobby/world/playerdata" \
     "${stack_root}/data/lobby/world/stats" \
@@ -178,6 +183,13 @@ setup_fake_stack() {
     "${stack_root}/plugin-persistence"
 
   printf 'proxy-config\n' > "${stack_root}/data/proxy/velocity.toml"
+  printf 'bind = "0.0.0.0:25565"\n' > "${stack_root}/config/proxy/velocity.toml"
+  printf 'force-resource-packs: false\n' > "${stack_root}/config/proxy/plugins/Geyser-Velocity/config.yml"
+  printf 'fake-key\n' > "${stack_root}/config/proxy/plugins/Geyser-Velocity/key.pem"
+  printf 'fake-forwarding-secret\n' > "${stack_root}/secrets/forwarding.secret"
+  printf 'motd=Lobby\n' > "${stack_root}/config/lobby/server.properties"
+  printf 'motd=Survival\n' > "${stack_root}/config/survival/server.properties"
+  printf 'motd=Creative\n' > "${stack_root}/config/creative/server.properties"
   printf 'lobby-data\n' > "${stack_root}/data/lobby/world/playerdata/lobby-player.dat"
   printf '{"stat":1}\n' > "${stack_root}/data/lobby/world/stats/lobby-player.json"
   printf '{"advancement":1}\n' > "${stack_root}/data/lobby/world/advancements/lobby-player.json"
@@ -219,7 +231,7 @@ TIMESTAMP="testbackup"
 ARCHIVE_PATH="${ROOT_DIR}/backups/daily/minecraft-${TIMESTAMP}.tar.gz"
 
 mkdir -p "${ROOT_DIR}/backups/daily"
-tar -czf "${ARCHIVE_PATH}" -C "${ROOT_DIR}" data
+tar -czf "${ARCHIVE_PATH}" -C "${ROOT_DIR}" data config secrets ops
 printf '%s\n' "${ARCHIVE_PATH}" >> "${ROOT_DIR}/backup-invocations.log"
 EOF
   chmod +x "${stack_root}/scripts/backup-worlds.sh"
@@ -292,6 +304,24 @@ test_restore_to_staging_from_local_archive() {
   [[ -f "${staged_restore}/data/survival/world/playerdata/player1.dat" ]]
 }
 
+test_backup_verify_checks_restored_config_assets() {
+  local stack_root archive_path json_output
+
+  setup_test_root
+  stack_root="${TEST_ROOT}/stack"
+  setup_fake_stack "${stack_root}"
+
+  bash "${stack_root}/scripts/backup-worlds.sh"
+  archive_path="${stack_root}/backups/daily/minecraft-testbackup.tar.gz"
+  export TARGET_BACKUPS_DIR="${stack_root}/backups"
+  export VERIFY_SCOPE="survival"
+  export VERIFY_OFFSITE_SNAPSHOT="0"
+  export VERIFY_CONFIG_ASSETS="1"
+
+  json_output="$(bash "${REPO_ROOT}/scripts/backup-verify.sh" --json)"
+  printf '%s' "${json_output}" | grep -F '"verified_config_assets": true' >/dev/null
+}
+
 test_promote_rollback_preserves_playerdata_by_default() {
   local stack_root stage_dir
 
@@ -334,6 +364,7 @@ test_promote_rollback_allows_playerdata_rollback_when_requested() {
 run_test "offsite backup includes extra paths fixture" test_offsite_backup_includes_extra_paths_fixture
 run_test "offsite backup runs hook fixture" test_offsite_backup_runs_hook_fixture
 run_test "restore to staging from local archive" test_restore_to_staging_from_local_archive
+run_test "backup verify checks restored config assets" test_backup_verify_checks_restored_config_assets
 run_test "promote rollback preserves playerdata by default" test_promote_rollback_preserves_playerdata_by_default
 run_test "promote rollback allows playerdata rollback" test_promote_rollback_allows_playerdata_rollback_when_requested
 

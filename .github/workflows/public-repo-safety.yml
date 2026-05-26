@@ -1,0 +1,16 @@
+name: Public Repo Safety
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  public-repo-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tracked files for public-safe defaults
+        run: bash ./scripts/public-repo-check.sh

@@ -8,6 +8,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/load-target-env.sh"
 
 ALLOW_PLAYERDATA_ROLLBACK=0
+JSON_OUTPUT=0
 
 capture_player_critical_tree() {
   local live_service_dir="$1"
@@ -110,6 +111,11 @@ main() {
 
   [[ $# -ge 1 ]] || fail "Usage: $0 <staged-restore> [service|full] [--allow-playerdata-rollback]"
 
+  if [[ "${1:-}" == "--json" ]]; then
+    JSON_OUTPUT=1
+    shift
+  fi
+
   staged_restore="$1"
   shift
   scope="full"
@@ -125,6 +131,10 @@ main() {
   fi
 
   [[ $# -eq 0 ]] || fail "Unexpected extra arguments: $*"
+
+  if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    exec 3>&1 1>&2
+  fi
 
   init_logging promote-rollback
   load_target_env
@@ -174,6 +184,17 @@ main() {
   fi
 
   log "Rollback promotion completed"
+  if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    python - "${staged_restore}" "${scope}" "${ALLOW_PLAYERDATA_ROLLBACK}" <<'PY' >&3
+import json, sys
+print(json.dumps({
+    "status": "success",
+    "stage_path": sys.argv[1],
+    "scope": sys.argv[2],
+    "allow_playerdata_rollback": sys.argv[3] == "1",
+}, sort_keys=True))
+PY
+  fi
 }
 
 main "$@"

@@ -11,6 +11,12 @@ source "${SCRIPT_DIR}/consistent-snapshot.sh"
 
 declare -a BACKUP_SOURCES=()
 declare -a EXTRA_BACKUP_PATHS=()
+JSON_OUTPUT=0
+
+if [[ "${1:-}" == "--json" ]]; then
+  JSON_OUTPUT=1
+  shift
+fi
 
 setup_restic_env() {
   load_repo_env
@@ -118,6 +124,31 @@ EOF
     ensure_dir "${METADATA_DIR}/ops/access"
     cp "${TARGET_INVITE_PLAYERS_FILE}" "${METADATA_DIR}/ops/access/invite-players.txt"
   fi
+
+  python - "${TARGET_STACK_ROOT}" "${TARGET_CONFIG_DIR}" "${TARGET_SECRETS_DIR}" "${METADATA_DIR}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+stack_root = Path(sys.argv[1])
+config_dir = Path(sys.argv[2])
+secrets_dir = Path(sys.argv[3])
+metadata_dir = Path(sys.argv[4])
+
+config_assets = {
+    "velocity_config": str(config_dir / "proxy/velocity.toml"),
+    "geyser_config": str(config_dir / "proxy/plugins/Geyser-Velocity/config.yml"),
+    "floodgate_key_primary": str(config_dir / "proxy/plugins/Geyser-Velocity/key.pem"),
+    "floodgate_key_runtime": str(stack_root / "data/proxy/plugins/floodgate/key.pem"),
+    "forwarding_secret": str(secrets_dir / "forwarding.secret"),
+    "proxy_plugin_manifest": str(stack_root / "plugins/proxy-plugins.txt"),
+}
+
+payload = {
+    "config_assets": {name: {"path": value, "exists": Path(value).exists()} for name, value in config_assets.items()}
+}
+(metadata_dir / "config-assets.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
 }
 
 load_extra_paths() {
@@ -171,6 +202,9 @@ build_backup_sources() {
     "${TARGET_LOBBY_DATA_DIR}"
     "${TARGET_SURVIVAL_DATA_DIR}"
     "${TARGET_CREATIVE_DATA_DIR}"
+    "${TARGET_ACCESS_DIR}"
+    "${TARGET_CONFIG_DIR}"
+    "${TARGET_SECRETS_DIR}"
     "${METADATA_DIR}"
   )
 
@@ -244,6 +278,8 @@ LOG_FILE=${LOG_FILE}
 EOF
 
   cat "${METADATA_DIR}/inventory-summary.env" >> "${manifest_file}"
+  printf 'RETENTION_CLASS=offsite\n' >> "${manifest_file}"
+  printf 'CONFIG_ASSETS_FILE=%s\n' "${METADATA_DIR}/config-assets.json" >> "${manifest_file}"
 
   log "Wrote run manifest to ${manifest_file}"
 }
@@ -257,6 +293,10 @@ perform_backup() {
 }
 
 main() {
+  if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    exec 3>&1 1>&2
+  fi
+
   init_logging offsite-backup
   setup_restic_env
   lock_or_fail
@@ -268,6 +308,18 @@ main() {
   write_run_manifest
 
   log "Offsite backup completed with snapshot ${SNAPSHOT_ID}"
+  if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    python - "${SNAPSHOT_ID}" "${RUN_TIMESTAMP}" "${LOG_FILE}" "${RUN_DIR}" <<'PY' >&3
+import json, sys
+print(json.dumps({
+    "status": "success",
+    "snapshot_id": sys.argv[1],
+    "created_at": sys.argv[2],
+    "log_file": sys.argv[3],
+    "run_dir": sys.argv[4],
+}, sort_keys=True))
+PY
+  fi
 }
 
 main "$@"
