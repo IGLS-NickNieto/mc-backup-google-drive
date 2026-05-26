@@ -275,7 +275,7 @@ fi
 if [[ -z "${GIT_REF}" && -n "${GIT_REPO_URL}" ]]; then
   GIT_REF="$(detect_remote_default_ref "${GIT_REPO_URL}")"
 fi
-GIT_REF="${GIT_REF:-main}"
+GIT_REF="${GIT_REF:-master}"
 
 if [[ -n "${GIT_REPO_URL}" ]]; then
   echo "Syncing backup repo into ${APP_DIR} from ${GIT_REPO_URL} (${GIT_REF})..."

@@ -14,3 +14,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check tracked files for public-safe defaults
         run: bash ./scripts/public-repo-check.sh
+      - name: Check reachable history for local-only data
+        run: bash ./scripts/public-history-check.sh

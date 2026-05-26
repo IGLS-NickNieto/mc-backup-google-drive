@@ -4,6 +4,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
 
+APP_OWNER="$(stat -c '%U' "${ROOT_DIR}")"
+
+run_as_app_owner() {
+  if [[ "$(id -un)" == "${APP_OWNER}" ]]; then
+    "$@"
+  else
+    sudo -u "${APP_OWNER}" "$@"
+  fi
+}
+
+run_as_app_owner bash "${ROOT_DIR}/scripts/ensure-env.sh"
+
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing ${ENV_FILE}; run scripts/bootstrap-companion.sh interactively once before enabling boot refresh." >&2
   exit 1
@@ -15,10 +27,11 @@ source "${ENV_FILE}"
 set +a
 
 ENABLE_GIT_SYNC_ON_BOOT="${ENABLE_GIT_SYNC_ON_BOOT:-0}"
+FORCE_GIT_REFRESH="${FORCE_GIT_REFRESH:-0}"
 GIT_REPO_URL="${GIT_REPO_URL:-}"
-GIT_REF="${GIT_REF:-main}"
+GIT_REF="${GIT_REF:-}"
 
-if [[ "${ENABLE_GIT_SYNC_ON_BOOT}" != "1" ]]; then
+if [[ "${ENABLE_GIT_SYNC_ON_BOOT}" != "1" && "${FORCE_GIT_REFRESH}" != "1" ]]; then
   echo "ENABLE_GIT_SYNC_ON_BOOT is not enabled; skipping backup startup refresh."
   exit 0
 fi
@@ -36,16 +49,6 @@ require_persisted_value() {
 require_persisted_value "GIT_REPO_URL"
 require_persisted_value "RESTIC_REPOSITORY"
 require_persisted_value "RESTIC_PASSWORD_FILE"
-
-APP_OWNER="$(stat -c '%U' "${ROOT_DIR}")"
-
-run_as_app_owner() {
-  if [[ "$(id -un)" == "${APP_OWNER}" ]]; then
-    "$@"
-  else
-    sudo -u "${APP_OWNER}" "$@"
-  fi
-}
 
 detect_remote_default_ref() {
   local repo_url="$1"
@@ -89,9 +92,21 @@ sync_repo_snapshot_from_git() {
   run_as_app_owner rm -rf "${temp_dir}"
 }
 
+if [[ -z "${GIT_REF}" ]]; then
+  GIT_REF="$(detect_remote_default_ref "${GIT_REPO_URL}")"
+fi
+GIT_REF="${GIT_REF:-master}"
+
 echo "Refreshing backup tracked files from ${GIT_REPO_URL} (${GIT_REF})..."
 sync_repo_snapshot_from_git "${GIT_REPO_URL}" "${GIT_REF}"
 
 cd "${ROOT_DIR}"
 run_as_app_owner chmod +x scripts/*.sh scripts/lib/*.sh
+run_as_app_owner bash "${ROOT_DIR}/scripts/ensure-env.sh"
+
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+
 ./scripts/install-systemd.sh

@@ -1,0 +1,11 @@
+* text=auto
+
+.gitattributes text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
+.env.example text eol=lf

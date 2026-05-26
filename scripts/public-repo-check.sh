@@ -44,7 +44,7 @@ check_tracked_content() {
 
   while IFS= read -r match; do
     case "${match}" in
-      scripts/public-repo-check.sh:*|docs/public-github-checklist.md:*)
+      scripts/public-repo-check.sh:*|scripts/public-history-check.sh:*|docs/public-github-checklist.md:*)
         continue
         ;;
     esac

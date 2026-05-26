@@ -15,6 +15,7 @@ Helpful checks:
 git status --short
 git ls-files
 ./scripts/public-repo-check.sh
+./scripts/public-history-check.sh
 rg -n --hidden -S "password|secret|token|api[_-]?key|BEGIN .*KEY|PRIVATE KEY|C:\\\\Users\\\\|/c/Users/|/Users/|/home/" .
 ```
 
