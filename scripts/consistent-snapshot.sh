@@ -20,6 +20,26 @@ send_console() {
   "${DOCKER_BIN}" exec --user 1000 "${container_name}" mc-send-to-console "$@"
 }
 
+server_notifications_enabled() {
+  [[ "${SERVER_NOTIFICATIONS_ENABLED:-1}" != "0" ]]
+}
+
+notify_container() {
+  local container_name="$1"
+  shift
+
+  server_notifications_enabled || return 0
+  send_console "${container_name}" say "$*" >/dev/null 2>&1 || true
+}
+
+notify_snapshot_containers() {
+  local container_name
+
+  for container_name in "${SNAPSHOT_CONTAINERS[@]}"; do
+    notify_container "${container_name}" "$@"
+  done
+}
+
 begin_consistent_snapshot() {
   local service_name container_name
 
@@ -33,6 +53,7 @@ begin_consistent_snapshot() {
 
     if container_running "${container_name}"; then
       log "Pausing world saves for ${service_name} (${container_name})"
+      notify_container "${container_name}" "Offsite backup starting; the server may pause briefly."
       send_console "${container_name}" save-off >/dev/null
       send_console "${container_name}" save-all flush >/dev/null
       SNAPSHOT_CONTAINERS+=("${container_name}")
@@ -41,6 +62,7 @@ begin_consistent_snapshot() {
     fi
   done < <(paper_services)
 
+  notify_snapshot_containers "Offsite backup snapshot in progress; world saves are briefly paused."
   sleep "${SNAPSHOT_SLEEP_SECONDS:-5}"
 }
 
@@ -59,6 +81,12 @@ run_with_consistent_snapshot() {
   begin_consistent_snapshot
   "$@" || exit_code=$?
   end_consistent_snapshot
+
+  if [[ "${exit_code}" == "0" ]]; then
+    notify_snapshot_containers "Offsite backup complete; world saves have resumed."
+  else
+    notify_snapshot_containers "Offsite backup failed; world saves have been resumed."
+  fi
 
   return "${exit_code}"
 }

@@ -10,6 +10,42 @@ source "${SCRIPT_DIR}/load-target-env.sh"
 ALLOW_PLAYERDATA_ROLLBACK=0
 JSON_OUTPUT=0
 
+server_notifications_enabled() {
+  [[ "${SERVER_NOTIFICATIONS_ENABLED:-1}" != "0" ]]
+}
+
+notify_container() {
+  local container_name="$1"
+  shift
+
+  server_notifications_enabled || return 0
+  "${DOCKER_BIN}" exec --user 1000 "${container_name}" mc-send-to-console say "$*" >/dev/null 2>&1 || true
+}
+
+notify_scope() {
+  local scope="$1"
+  local service_name container_name
+  shift
+
+  while IFS= read -r service_name; do
+    is_paper_service "${service_name}" || continue
+    container_name="$(container_for_service "${service_name}")"
+    notify_container "${container_name}" "$@"
+  done < <(scope_services "${scope}")
+}
+
+maintenance_countdown() {
+  local scope="$1"
+  local message="$2"
+
+  server_notifications_enabled || return 0
+
+  notify_scope "${scope}" "${message} in 30 seconds."
+  sleep "${SERVER_NOTIFICATION_COUNTDOWN_INITIAL_SLEEP:-20}"
+  notify_scope "${scope}" "${message} in 10 seconds."
+  sleep "${SERVER_NOTIFICATION_COUNTDOWN_FINAL_SLEEP:-10}"
+}
+
 capture_player_critical_tree() {
   local live_service_dir="$1"
   local output_dir="$2"
@@ -106,6 +142,13 @@ verify_preserved_playerdata() {
   done < <(scope_services "${scope}")
 }
 
+recover_from_failed_promotion() {
+  local scope="$1"
+
+  start_scope_containers "${scope}" >/dev/null 2>&1 || true
+  notify_scope "${scope}" "Rollback promotion failed; servers were restarted with existing data."
+}
+
 main() {
   local staged_restore scope preserve_root service_name live_dir data_root
 
@@ -162,8 +205,9 @@ main() {
     done < <(scope_services "${scope}")
   fi
 
+  maintenance_countdown "${scope}" "Rollback promotion"
   stop_scope_containers "${scope}"
-  trap "start_scope_containers '${scope}' >/dev/null 2>&1 || true" EXIT
+  trap "recover_from_failed_promotion '${scope}'" EXIT
 
   replace_live_data_from_stage "${data_root}" "${scope}"
 
@@ -178,6 +222,7 @@ main() {
 
   start_scope_containers "${scope}"
   trap - EXIT
+  notify_scope "${scope}" "Rollback promotion complete; servers are starting back up."
 
   if [[ "${ALLOW_PLAYERDATA_ROLLBACK}" != "1" ]]; then
     verify_preserved_playerdata "${preserve_root}" "${scope}"
